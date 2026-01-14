@@ -1,0 +1,313 @@
+-- บริการต่างๆ
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+----------------------------------------------------------------
+-- ⚙️ CONFIG (ตั้งค่า)
+----------------------------------------------------------------
+local Config = {
+	Speed = 100,
+
+	-- ใส่ชื่อ Remote ให้ถูกต้อง (สำคัญมาก!)
+	EggRemoteName = "BuyEggFunction", 
+	PotionRemoteName = "BuyPotionFunction",
+
+	-- รายชื่อไข่ (ต้องตรงกับชื่อในเกม)
+	EggList = {
+		"Plain Egg", "Mud Egg", "Speckled Egg", "Hydro Egg", 
+		"Tentacle Egg", "Frost Egg", "Demon Egg", "Horn Egg", 
+		"Cacti Egg", "Volt Egg", "Plume Egg", "Tiger Egg"
+	},
+
+	-- รายชื่อยา
+	PotionList = {
+		"Size Potion", "Rebirth Potion", "Enchant Potion"
+	}
+}
+
+-- ตารางเก็บสถานะว่าเลือกอันไหนบ้าง (อย่าแก้ตรงนี้)
+local SelectedEggs = {} 
+local SelectedPotions = {}
+
+----------------------------------------------------------------
+-- 🖥️ GUI SETUP (สร้างหน้าต่าง)
+----------------------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MultiAutoGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 360, 0, 500) -- ขยายให้กว้างขึ้นนิดนึง
+MainFrame.Position = UDim2.new(0.5, -180, 0.5, -250)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+-- หัวข้อ (Title)
+local TitleBar = Instance.new("TextLabel")
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+TitleBar.Text = "  Multi-Buy System (ลากได้)"
+TitleBar.TextColor3 = Color3.new(1,1,1)
+TitleBar.Font = Enum.Font.GothamBold
+TitleBar.TextSize = 18
+TitleBar.TextXAlignment = Enum.TextXAlignment.Left
+TitleBar.Parent = MainFrame
+
+-- ปุ่มย่อ/ขยาย
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 40, 0, 40)
+MinBtn.Position = UDim2.new(1, -40, 0, 0)
+MinBtn.BackgroundTransparency = 1
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.new(1,1,1)
+MinBtn.TextSize = 24
+MinBtn.Parent = TitleBar
+
+-- พื้นที่ใส่เนื้อหา (ScrollingFrame)
+local Container = Instance.new("ScrollingFrame")
+Container.Size = UDim2.new(1, -10, 1, -50)
+Container.Position = UDim2.new(0, 5, 0, 45)
+Container.BackgroundTransparency = 1
+Container.ScrollBarThickness = 4
+Container.Parent = MainFrame
+
+local Layout = Instance.new("UIListLayout")
+Layout.Parent = Container
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+Layout.Padding = UDim.new(0, 15)
+
+----------------------------------------------------------------
+-- 🛠️ ฟังก์ชันช่วยสร้าง GUI
+----------------------------------------------------------------
+local function createHeader(text)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 0, 25)
+	label.BackgroundTransparency = 1
+	label.Text = "--- " .. text .. " ---"
+	label.TextColor3 = Color3.fromRGB(255, 200, 50)
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 16
+	label.Parent = Container
+end
+
+local function createGridArea()
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, 0, 0, 0) -- เดี๋ยวจะ Auto Size
+	frame.BackgroundTransparency = 1
+	frame.Parent = Container
+
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.new(0, 105, 0, 40) -- ขนาดปุ่ม
+	grid.CellPadding = UDim2.new(0, 5, 0, 5)
+	grid.FillDirectionMaxCells = 3 -- แถวละ 3 ปุ่ม
+	grid.Parent = frame
+
+	return frame, grid
+end
+
+-- ฟังก์ชันสร้างปุ่มเลือกของ (Toggle Button)
+local function createItemButton(name, tableRef, parentFrame)
+	local btn = Instance.new("TextButton")
+	btn.Text = name
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- สีเทา (ยังไม่เลือก)
+	btn.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+	btn.Font = Enum.Font.Gotham
+	btn.TextSize = 12
+	btn.TextWrapped = true
+	btn.Parent = parentFrame
+
+	-- มุมโค้ง
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = btn
+
+	-- เวลากดปุ่ม
+	btn.MouseButton1Click:Connect(function()
+		tableRef[name] = not tableRef[name] -- สลับ True/False
+
+		if tableRef[name] then
+			-- ถ้าเลือก: สีเขียว
+			btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+			btn.TextColor3 = Color3.new(1,1,1)
+		else
+			-- ถ้าไม่เลือก: สีเทา
+			btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+			btn.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+		end
+	end)
+end
+
+----------------------------------------------------------------
+-- 1. ส่วน Speed (เหมือนเดิม)
+----------------------------------------------------------------
+createHeader("Movement")
+local SpeedToggle = Instance.new("TextButton")
+SpeedToggle.Size = UDim2.new(1, -10, 0, 45)
+SpeedToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SpeedToggle.Text = "Speed Run: OFF"
+SpeedToggle.TextColor3 = Color3.new(1,1,1)
+SpeedToggle.Font = Enum.Font.GothamSemibold
+SpeedToggle.TextSize = 16
+SpeedToggle.Parent = Container
+
+local speedActive = false
+SpeedToggle.MouseButton1Click:Connect(function()
+	speedActive = not speedActive
+	if speedActive then
+		SpeedToggle.Text = "Speed Run: ON"
+		SpeedToggle.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+		if player.Character then player.Character.Humanoid.WalkSpeed = Config.Speed end
+	else
+		SpeedToggle.Text = "Speed Run: OFF"
+		SpeedToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		if player.Character then player.Character.Humanoid.WalkSpeed = 16 end
+	end
+end)
+player.CharacterAdded:Connect(function(c) 
+	if speedActive then c:WaitForChild("Humanoid").WalkSpeed = Config.Speed end 
+end)
+
+----------------------------------------------------------------
+-- 2. ส่วน Eggs (Multi Select)
+----------------------------------------------------------------
+createHeader("Select Eggs to Buy")
+local EggFrame, EggGrid = createGridArea()
+
+-- สร้างปุ่มให้ครบทุกไข่ใน List
+for _, eggName in ipairs(Config.EggList) do
+	createItemButton(eggName, SelectedEggs, EggFrame)
+end
+
+-- ปรับความสูงของกรอบตามจำนวนปุ่ม
+local rows = math.ceil(#Config.EggList / 3)
+EggFrame.Size = UDim2.new(1, 0, 0, (rows * 45))
+
+-- ปุ่ม Master Switch (เริ่มซื้อไข่)
+local MasterEggBtn = Instance.new("TextButton")
+MasterEggBtn.Size = UDim2.new(1, -10, 0, 45)
+MasterEggBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- สีแดง
+MasterEggBtn.Text = "[ STOPPED ] Press to Start Buying Eggs"
+MasterEggBtn.TextColor3 = Color3.new(1,1,1)
+MasterEggBtn.Font = Enum.Font.GothamBold
+MasterEggBtn.TextSize = 16
+MasterEggBtn.Parent = Container
+
+local buyingEggs = false
+MasterEggBtn.MouseButton1Click:Connect(function()
+	buyingEggs = not buyingEggs
+	if buyingEggs then
+		MasterEggBtn.Text = "[ RUNNING ] Buying Selected Eggs..."
+		MasterEggBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+
+		-- Loop ซื้อไข่
+		task.spawn(function()
+			while buyingEggs do
+				local remote = ReplicatedStorage:FindFirstChild(Config.EggRemoteName)
+				if remote then
+					-- วนเช็คว่าไข่อันไหนถูกเลือกบ้าง
+					for name, isSelected in pairs(SelectedEggs) do
+						if isSelected then
+							-- ส่งคำสั่งซื้อทีละอัน
+							pcall(function()
+								remote:FireServer(name, "Buy")
+							end)
+							task.wait(0.1) -- เว้นระยะนิดนึงกันค้าง
+						end
+					end
+				end
+				task.wait(0.5) -- รอบการวน
+			end
+		end)
+	else
+		MasterEggBtn.Text = "[ STOPPED ] Press to Start Buying Eggs"
+		MasterEggBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	end
+end)
+
+----------------------------------------------------------------
+-- 3. ส่วน Potions (Multi Select)
+----------------------------------------------------------------
+createHeader("Select Potions")
+local PotionFrame, PotionGrid = createGridArea()
+
+for _, potName in ipairs(Config.PotionList) do
+	createItemButton(potName, SelectedPotions, PotionFrame)
+end
+PotionFrame.Size = UDim2.new(1, 0, 0, 50) -- 3 ปุ่มแถวเดียว
+
+-- ปุ่ม Master Switch (เริ่มซื้อยา)
+local MasterPotBtn = Instance.new("TextButton")
+MasterPotBtn.Size = UDim2.new(1, -10, 0, 45)
+MasterPotBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+MasterPotBtn.Text = "[ STOPPED ] Press to Start Buying Potions"
+MasterPotBtn.TextColor3 = Color3.new(1,1,1)
+MasterPotBtn.Font = Enum.Font.GothamBold
+MasterPotBtn.TextSize = 16
+MasterPotBtn.Parent = Container
+
+local buyingPotions = false
+MasterPotBtn.MouseButton1Click:Connect(function()
+	buyingPotions = not buyingPotions
+	if buyingPotions then
+		MasterPotBtn.Text = "[ RUNNING ] Auto Buy Potions"
+		MasterPotBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+
+		-- Loop ซื้อยา
+		task.spawn(function()
+			while buyingPotions do
+				local remote = ReplicatedStorage:FindFirstChild(Config.PotionRemoteName)
+				if remote then
+					for name, isSelected in pairs(SelectedPotions) do
+						if isSelected then
+							pcall(function()
+								remote:FireServer(name)
+							end)
+						end
+					end
+				end
+				task.wait(2) -- ไม่รัวมาก (2-5 วิ)
+			end
+		end)
+	else
+		MasterPotBtn.Text = "[ STOPPED ] Press to Start Buying Potions"
+		MasterPotBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	end
+end)
+
+----------------------------------------------------------------
+-- Logic ลากหน้าต่าง & ย่อ
+----------------------------------------------------------------
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+	local delta = input.Position - dragStart
+	MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+TitleBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+		input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+	end
+end)
+TitleBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then update(input) end end)
+
+local isMin = false
+MinBtn.MouseButton1Click:Connect(function()
+	isMin = not isMin
+	if isMin then
+		MainFrame.Size = UDim2.new(0, 360, 0, 40)
+		Container.Visible = false
+		MinBtn.Text = "+"
+	else
+		MainFrame.Size = UDim2.new(0, 360, 0, 500)
+		Container.Visible = true
+		MinBtn.Text = "-"
+	end
+end)
