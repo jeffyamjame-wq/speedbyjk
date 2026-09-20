@@ -3,7 +3,7 @@ local UserInputService = game:GetService("UserInputService")
 
 -- ตั้งค่าความเร็ว
 local normalSpeed = 16
-local runSpeed = 100
+local runSpeed = 250
 
 -- 1. สร้างตัว GUI หลัก
 local screenGui = Instance.new("ScreenGui")
@@ -17,7 +17,7 @@ openBtn.Name = "OpenButton"
 openBtn.Size = UDim2.new(0, 120, 0, 50)
 openBtn.Position = UDim2.new(0, 10, 0.5, -25) -- ตำแหน่งกลางซ้ายของจอ
 openBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255) -- สีฟ้า
-openBtn.Text = "เมนูวิ่งไว"
+openBtn.Text = "Speedset"
 openBtn.TextColor3 = Color3.new(1,1,1)
 openBtn.TextSize = 20
 openBtn.Font = Enum.Font.GothamBold
